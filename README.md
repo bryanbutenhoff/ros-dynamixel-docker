@@ -1,10 +1,10 @@
 # ros-dynamixel-docker
 
 ## Requirements
-usb2dynamixel
-dynamixel AX12A
-docker (compatible with docker-compose v3)
-docker-compose
+- usb2dynamixel
+- dynamixel AX12A
+- docker (compatible with docker-compose v3)
+- docker-compose
 
 ## Running
 docker-compose up --build
