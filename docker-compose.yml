@@ -25,6 +25,8 @@ services:
     devices:
     - /dev/ttyUSB0:/dev/ttyUSB0
     environment:
+    - "TTL_DEVICE=/dev/ttyUSB0"
+    - "DXL_IDS=6"
     - "ROS_HOSTNAME=servo"
     - "ROS_MASTER_URI=http://master:11311"
     command: ./entrypoint.sh

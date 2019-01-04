@@ -5,7 +5,7 @@ from std_msgs.msg import UInt64
 
 class DataRunner:
   count = 500
-  count_rate = 10
+  count_rate = 2
 
   def get_data(self):
     self.count += self.count_rate
@@ -16,7 +16,7 @@ class DataRunner:
 def controller():
   pub = rospy.Publisher('servo_command', UInt64, queue_size=10)
   rospy.init_node('controller', anonymous=True)
-  rate = rospy.Rate(10) # 1hz
+  rate = rospy.Rate(60) # 1hz
   dataRunner = DataRunner()
   while not rospy.is_shutdown():
     data = dataRunner.get_data()
