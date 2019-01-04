@@ -10,108 +10,34 @@
 import rospy
 from std_msgs.msg import UInt64
 
-# Script Specific
-from dynamixel_sdk import *
+import os
+from servowrapper import Usb2Dynamixel
+from servowrapper import AX12Servo
+from functools import partial
 
-class DynamixelServo:
+def callback(servo, usb_dynamixel, data):
+  servo.set_goal_position(usb_dynamixel, data.data)
 
-  ADDR_MX_TORQUE_ENABLE      = 18
-  ADDR_MX_GOAL_POSITION      = 30
-  ADDR_MX_PRESENT_POSITION   = 36
-
-  PROTOCOL_VERSION            = 1.0
-
-  DXL_ID                      = 6
-  BAUDRATE                    = 1000000
-  DEVICENAME                  = '/dev/ttyUSB0'
-
-  TORQUE_ENABLE               = 1
-  TORQUE_DISABLE              = 0
-  DXL_MINIMUM_POSITION_VALUE  = 10
-  DXL_MAXIMUM_POSITION_VALUE  = 1000
-  DXL_MOVING_STATUS_THRESHOLD = 10
-
-  def __init__(self):
-    self.portHandler = PortHandler(self.DEVICENAME)
-    self.packetHandler = PacketHandler(self.PROTOCOL_VERSION)
-
-    if not self.portHandler.openPort():
-      print("Failed to open the port")
-      quit()
-    if not self.portHandler.setBaudRate(self.BAUDRATE):
-      print("Failed to change the baudrate")
-      quit()
-
-  # Close port on destruction
-  def __del__(self):
-    self.portHandler.closePort()
-
-  def check_comm_result(self, dxl_comm_result, dxl_error):
-    if dxl_comm_result != COMM_SUCCESS:
-      print("%s" % self.packetHandler.getTxRxResult(dxl_comm_result))
-    elif dxl_error != 0:
-      print("%s" % self.packetHandler.getRxPacketError(dxl_error))
-
-  def write_one_byte(self, address, value):
-    dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, self.DXL_ID, address, value)
-    self.check_comm_result(dxl_comm_result, dxl_error)
-
-  def write_two_bytes(self, address, value):
-    dxl_comm_result, dxl_error = self.packetHandler.write2ByteTxRx(self.portHandler, self.DXL_ID, address, value)
-    self.check_comm_result(dxl_comm_result, dxl_error)
-
-  def read_one_bytes(self, address):
-    dxl_response, dxl_comm_result, dxl_error = self.packetHandler.read1ByteTxRx(self.portHandler, self.DXL_ID, address)
-    self.check_comm_result(dxl_comm_result, dxl_error)
-    return dxl_response
-
-  def read_two_bytes(self, address):
-    dxl_response, dxl_comm_result, dxl_error = self.packetHandler.read2ByteTxRx(self.portHandler, self.DXL_ID, address)
-    self.check_comm_result(dxl_comm_result, dxl_error)
-    return dxl_response
-
-  def enable_torque(self):
-    self.write_one_byte(self.ADDR_MX_TORQUE_ENABLE, self.TORQUE_ENABLE)
-
-  def disable_torque(self):
-    self.write_one_byte(self.ADDR_MX_TORQUE_ENABLE, self.TORQUE_DISABLE)
-
-# ROS METHODS
-  def run(self):
-    rospy.init_node('servo', anonymous=True)
-    rospy.Subscriber("servo_command", UInt64, self.callback)
-    rospy.spin()
-
-  def callback(self, data):
-    rospy.loginfo(rospy.get_caller_id() + "GoalPos:%03d", data.data)
-    self.write_two_bytes(self.ADDR_MX_GOAL_POSITION, data.data)
-
-## STANDALONE
-#  def run(self, goal_position):
-#    self.write_two_bytes(self.ADDR_MX_GOAL_POSITION, goal_position)
-#    
-#    while 1:
-#      dxl_present_position = self.read_two_bytes(self.ADDR_MX_PRESENT_POSITION)
-#    
-#      print("[ID:%03d] GoalPos:%03d  PresPos:%03d" % (self.DXL_ID, goal_position, dxl_present_position))
-#
-#      if not abs(goal_position - dxl_present_position) > self.DXL_MOVING_STATUS_THRESHOLD:
-#        break
+def run(servo, usb_dynamixel):
+  rospy.init_node('servo', anonymous=True)
+  rospy.Subscriber("servo_command", UInt64, partial(callback, servo, usb_dynamixel))
+  rospy.spin()
 
 if __name__ == "__main__":
-  my_servo = DynamixelServo()
+
+  # Create a Usb2Dynamixel for communication
+  device_name = os.environ['TTL_DEVICE']
+  baud_rate = 1000000
+  protocol_version = 1.0
+  usb_dynamixel = Usb2Dynamixel(device_name, baud_rate, protocol_version)
+
+  # Create a servo instance for defined ID
+  id = int(os.environ['DXL_IDS'])
+  servo = AX12Servo(id)
+
   try:
-    my_servo.enable_torque()
-
-# ROS METHODS
-    my_servo.run()
-    my_servo.disable_torque()
+    servo.enable_torque(usb_dynamixel)
+    run(servo, usb_dynamixel)
+    servo.disable_torque(usb_dynamixel)
   except rospy.ROSInterruptException:
-    my_servo.disable_torque()
-
-## STANDALONE
-#    my_servo.run(1000)
-#    my_servo.run(10)
-#    my_servo.disable_torque()
-#  except:
-#    my_servo.disable_torque()
+    servo.disable_torque(usb_dynamixel)
